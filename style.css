@@ -146,6 +146,10 @@ input[type="color"] {
 #viewer[data-tool="select"] .overlay { cursor: default; }
 #viewer[data-tool="text"] .overlay,
 #viewer[data-tool="edittext"] .overlay { cursor: text; }
+/* Con estas herramientas el dedo desplaza y amplía la página. */
+#viewer[data-tool="select"] .overlay,
+#viewer[data-tool="text"] .overlay,
+#viewer[data-tool="edittext"] .overlay { touch-action: pan-x pan-y pinch-zoom; }
 
 #textEditor {
   display: none;

@@ -16,10 +16,10 @@ const HINTS = {
   select: 'Haz clic en un elemento para seleccionarlo y arrástralo para moverlo. Doble clic en un texto para editarlo. Supr lo elimina.',
   edittext: 'Haz clic sobre un texto del PDF (recuadros punteados) para reescribirlo. Si lo dejas vacío, el texto se borra.',
   text: 'Haz clic en la página donde quieras escribir.',
-  whiteout: 'Arrastra para tapar una zona con un rectángulo blanco.',
-  highlight: 'Arrastra sobre la zona que quieras resaltar.',
-  rect: 'Arrastra para dibujar un rectángulo.',
-  draw: 'Arrastra para dibujar a mano alzada (útil para firmar).',
+  whiteout: 'Arrastra para tapar una zona con un rectángulo blanco. En el móvil, vuelve a Seleccionar para desplazar la página.',
+  highlight: 'Arrastra sobre la zona que quieras resaltar. En el móvil, vuelve a Seleccionar para desplazar la página.',
+  rect: 'Arrastra para dibujar un rectángulo. En el móvil, vuelve a Seleccionar para desplazar la página.',
+  draw: 'Arrastra para dibujar a mano alzada (útil para firmar). En el móvil, vuelve a Seleccionar para desplazar la página.',
 };
 
 // Estado. Las anotaciones se guardan en coordenadas de la página tal como
@@ -35,6 +35,7 @@ let tool = 'select';
 let sel = null;     // { p, a }
 let editing = null; // { v, a }
 let drag = null;
+let tap = null;     // toque pendiente de confirmar al soltar (herramientas de texto)
 let undoStack = [];
 let redoStack = [];
 let fileName = 'documento';
@@ -210,6 +211,12 @@ function makeView(p, i, info) {
   v.box.append(v.canvas, v.overlay);
 
   v.overlay.addEventListener('mousedown', e => e.preventDefault());
+  // En pantallas táctiles el dedo desplaza la página, salvo que empiece sobre
+  // un elemento que se pueda arrastrar.
+  v.overlay.addEventListener('touchstart', e => {
+    if (tool !== 'select' || e.touches.length !== 1) return;
+    if (grabAt(v, ...eventPoint(v, e.touches[0]))) e.preventDefault();
+  }, { passive: false });
   v.overlay.addEventListener('pointerdown', e => onDown(v, e));
   v.overlay.addEventListener('pointermove', e => onMove(v, e));
   v.overlay.addEventListener('pointerup', e => onUp(v, e));
@@ -532,6 +539,36 @@ function select(s) {
   updateUI();
 }
 
+// Elemento que se agarraría en ese punto con la herramienta Seleccionar.
+function grabAt(v, x, y) {
+  const p = v.p;
+  if (sel && sel.p === p && resizable(sel.a)) {
+    const f = frame(sel.a);
+    const [lx, ly] = toLocal(f, x, y);
+    const r = 12 / scale;
+    if (Math.abs(lx - f.x - f.w) <= r && Math.abs(ly - f.y - f.h) <= r) return { mode: 'resize', a: sel.a };
+  }
+  const a = hit(p, x, y);
+  return a ? { mode: 'move', a } : null;
+}
+
+// Escribe texto nuevo o reescribe el que hay en ese punto.
+function editTextAt(v, x, y) {
+  const p = v.p;
+  let a = tool === 'edittext' ? hit(p, x, y, 'text') : null;
+  if (!a) {
+    const it = tool === 'edittext' && itemAt(v, x, y);
+    if (tool === 'edittext' && !it) return;
+    a = it ? annFromItem(v, it)
+      : { type: 'text', x, y, rot: (360 - p.rot) % 360, size: fontSize(), color: $('color').value, text: '' };
+    pushUndo();
+    p.anns.push(a);
+  } else {
+    pushUndo();
+  }
+  startEdit(v, a);
+}
+
 function onDown(v, e) {
   if (e.button) return;
   const wasEditing = editing;
@@ -541,33 +578,12 @@ function onDown(v, e) {
   const prevSel = sel;
 
   if (tool === 'select') {
-    let mode = 'move', a = null;
-    if (sel && sel.p === p && resizable(sel.a)) {
-      const f = frame(sel.a);
-      const [lx, ly] = toLocal(f, x, y);
-      const r = 8 / scale;
-      if (Math.abs(lx - f.x - f.w) <= r && Math.abs(ly - f.y - f.h) <= r) {
-        mode = 'resize';
-        a = sel.a;
-      }
-    }
-    if (!a) a = hit(p, x, y);
-    select(a ? { p, a } : null);
-    if (a) drag = { mode, a, x, y, moved: false, ratio: a.h / a.w };
+    const g = grabAt(v, x, y);
+    select(g ? { p, a: g.a } : null);
+    if (g) drag = { mode: g.mode, a: g.a, x, y, moved: false, ratio: g.a.h / g.a.w };
   } else if (tool === 'text' || tool === 'edittext') {
-    if (wasEditing) return;
-    let a = tool === 'edittext' ? hit(p, x, y, 'text') : null;
-    if (!a) {
-      const it = tool === 'edittext' && itemAt(v, x, y);
-      if (tool === 'edittext' && !it) return;
-      a = it ? annFromItem(v, it)
-        : { type: 'text', x, y, rot: (360 - p.rot) % 360, size: fontSize(), color: $('color').value, text: '' };
-      pushUndo();
-      p.anns.push(a);
-    } else {
-      pushUndo();
-    }
-    startEdit(v, a);
+    // Se actúa al soltar: si el gesto resulta ser un desplazamiento, no se escribe nada.
+    tap = wasEditing ? null : { v, cx: e.clientX, cy: e.clientY };
     return;
   } else if (tool === 'draw') {
     pushUndo();
@@ -624,7 +640,15 @@ function onMove(v, e) {
   drawOverlay(v);
 }
 
-function onUp(v) {
+function onUp(v, e) {
+  if (tap) {
+    const t = tap;
+    tap = null;
+    if (e.type === 'pointerup' && t.v === v && Math.hypot(e.clientX - t.cx, e.clientY - t.cy) < 10) {
+      editTextAt(v, ...eventPoint(v, e));
+    }
+    return;
+  }
   if (!drag) return;
   const { mode, a } = drag;
   drag = null;
