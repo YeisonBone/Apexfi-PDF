@@ -162,3 +162,19 @@ input[type="color"] {
   overflow: hidden;
   resize: none;
 }
+
+#credit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #c9cdd8;
+  background: #1f2430;
+}
+
+#credit img {
+  border-radius: 50%;
+  object-fit: cover;
+}
