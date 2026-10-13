@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor de PDF</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="bar">
+  <div class="group">
+    <button id="btnOpen" class="primary">Abrir PDF</button>
+    <button id="btnAdd" class="needs-doc" title="Añadir las páginas de otro PDF al final">Añadir PDF</button>
+    <button id="btnSave" class="needs-doc primary">Guardar</button>
+  </div>
+  <div class="group" id="tools">
+    <button data-tool="select" class="needs-doc">Seleccionar</button>
+    <button data-tool="edittext" class="needs-doc">Editar texto</button>
+    <button data-tool="text" class="needs-doc">Añadir texto</button>
+    <button data-tool="whiteout" class="needs-doc">Tapar</button>
+    <button data-tool="highlight" class="needs-doc">Resaltar</button>
+    <button data-tool="rect" class="needs-doc">Rectángulo</button>
+    <button data-tool="draw" class="needs-doc">Dibujar</button>
+    <button id="btnImage" class="needs-doc">Imagen</button>
+  </div>
+  <div class="group">
+    <label title="Color">Color <input type="color" id="color" value="#000000"></label>
+    <label title="Tamaño de letra">Letra <input type="number" id="fontSize" value="14" min="4" max="200"></label>
+    <label title="Grosor de línea">Grosor <input type="number" id="stroke" value="2" min="1" max="40"></label>
+  </div>
+  <div class="group">
+    <button id="btnUndo" title="Deshacer (Ctrl+Z)">↶</button>
+    <button id="btnRedo" title="Rehacer (Ctrl+Y)">↷</button>
+    <button id="btnDelete" title="Eliminar selección (Supr)">Eliminar</button>
+  </div>
+  <div class="group">
+    <button id="zoomOut" class="needs-doc">−</button>
+    <span id="zoomLabel">100%</span>
+    <button id="zoomIn" class="needs-doc">+</button>
+  </div>
+</header>
+<div id="hint"></div>
+
+<main id="viewer" data-tool="select">
+  <div id="empty">
+    <h1>Editor de PDF</h1>
+    <p>Abre un PDF o arrástralo aquí para empezar.</p>
+    <p class="small">El archivo se procesa en tu navegador; no se sube a ningún servidor.</p>
+  </div>
+</main>
+
+<textarea id="textEditor" spellcheck="false"></textarea>
+<input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+<input type="file" id="imgInput" accept="image/*" hidden>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
